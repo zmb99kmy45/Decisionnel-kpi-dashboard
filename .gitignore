@@ -1,0 +1,17 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# data (si lourd)
+data/raw/
+data/interim/
+data/processed/
+
+# notebooks
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
