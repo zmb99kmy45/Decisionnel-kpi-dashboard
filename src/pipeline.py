@@ -1,4 +1,4 @@
-from __future__ import annotations
+import os
 
 import pandas as pd
 
@@ -18,7 +18,6 @@ REQUIRED_COLUMNS = [
 
 
 def load_raw_csv(path: str) -> pd.DataFrame:
-    """Load raw procurement CSV and validate expected columns."""
     df = pd.read_csv(path)
 
     missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
@@ -29,64 +28,64 @@ def load_raw_csv(path: str) -> pd.DataFrame:
 
 
 def build_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Clean data types and create decision-support features/KPIs."""
-    out = df.copy()
+    df = df.copy()
 
-    # Dates
-    out["Order_Date"] = pd.to_datetime(out["Order_Date"], errors="coerce")
-    out["Delivery_Date"] = pd.to_datetime(out["Delivery_Date"], errors="coerce")
+    # Convert dates
+    df["Order_Date"] = pd.to_datetime(df["Order_Date"], errors="coerce")
+    df["Delivery_Date"] = pd.to_datetime(df["Delivery_Date"], errors="coerce")
 
-    # Core features
-    out["Lead_Time_Days"] = (out["Delivery_Date"] - out["Order_Date"]).dt.days
+    # Lead time
+    df["Lead_Time_Days"] = (df["Delivery_Date"] - df["Order_Date"]).dt.days
+    df.loc[df["Lead_Time_Days"] < 0, "Lead_Time_Days"] = pd.NA
 
-    # Numerical hygiene
+    # Numeric cleanup
     for col in ["Quantity", "Unit_Price", "Negotiated_Price", "Defective_Units"]:
-        out[col] = pd.to_numeric(out[col], errors="coerce")
+        df[col] = pd.to_numeric(df[col], errors="coerce")
 
     # Financial KPIs
-    out["Total_Spend"] = out["Quantity"] * out["Negotiated_Price"]
-    out["List_Spend"] = out["Quantity"] * out["Unit_Price"]
-    out["Savings"] = (out["Unit_Price"] - out["Negotiated_Price"]) * out["Quantity"]
-    out["Savings_Rate"] = out["Savings"] / out["List_Spend"]
+    df["Total_Spend"] = df["Quantity"] * df["Negotiated_Price"]
+    df["List_Spend"] = df["Quantity"] * df["Unit_Price"]
+    df["Savings"] = (df["Unit_Price"] - df["Negotiated_Price"]) * df["Quantity"]
+    df["Savings_Rate"] = df["Savings"] / df["List_Spend"]
 
     # Quality KPIs
-    out["Defective_Units"] = out["Defective_Units"].fillna(0)
-    out["Defect_Rate"] = out["Defective_Units"] / out["Quantity"]
+    df["Defective_Units"] = df["Defective_Units"].fillna(0)
+    df["Defect_Rate"] = df["Defective_Units"] / df["Quantity"]
 
-    # Compliance (Yes/No -> boolean)
-    out["Is_Compliant"] = (
-        out["Compliance"].astype(str).str.strip().str.lower().eq("yes")
-    )
+    # Flags
+    df["Is_Compliant"] = df["Compliance"].astype(str).str.lower().eq("yes")
+    df["Is_Delivered"] = df["Order_Status"].astype(str).str.lower().eq("delivered")
 
-    # Delivered flag
-    out["Is_Delivered"] = (
-        out["Order_Status"].astype(str).str.strip().str.lower().eq("delivered")
-    )
-
-    # Cleanup: avoid inf values from division by 0
-    out["Savings_Rate"] = out["Savings_Rate"].replace(
-        [pd.NA, float("inf"), float("-inf")], pd.NA
-    )
-    out["Defect_Rate"] = out["Defect_Rate"].replace(
-        [pd.NA, float("inf"), float("-inf")], pd.NA
-    )
-
-    return out
+    return df
 
 
 def load_and_prepare(path: str) -> pd.DataFrame:
-    """Convenience function: load raw CSV + build features."""
     raw = load_raw_csv(path)
-    clean = build_features(raw)
-    return clean
+    return build_features(raw)
 
 
-def export_processed(
-    df: pd.DataFrame, out_path: str = "data/processed/procurement_processed.parquet"
+# ==============================
+# Parquet optimization
+# ==============================
+
+
+def build_processed_parquet(
+    csv_path: str = "data/raw/procurement_kpi.csv",
+    parquet_path: str = "data/processed/procurement_processed.parquet",
 ) -> str:
-    """Export processed dataset for faster loading in Streamlit."""
-    import os
 
     os.makedirs("data/processed", exist_ok=True)
-    df.to_parquet(out_path, index=False)
-    return out_path
+
+    df = load_and_prepare(csv_path)
+    df.to_parquet(parquet_path, index=False)
+
+    return parquet_path
+
+
+def load_prepared(csv_path: str, parquet_path: str) -> pd.DataFrame:
+
+    if os.path.exists(parquet_path):
+        return pd.read_parquet(parquet_path)
+
+    build_processed_parquet(csv_path, parquet_path)
+    return pd.read_parquet(parquet_path)
