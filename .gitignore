@@ -1,16 +1,16 @@
-# python
+# Python
 __pycache__/
 *.pyc
 .venv/
 venv/
 .env
 
-# data (si lourd)
-# data/raw/
-data/interim/
+# Data
+data/raw/
+!data/raw/procurement_kpi.csv
 data/processed/
 
-# notebooks
+# Notebooks
 .ipynb_checkpoints/
 
 # OS
