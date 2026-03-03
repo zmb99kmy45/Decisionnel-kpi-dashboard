@@ -95,10 +95,3 @@ streamlit run app/app.py
 
 ---
 
-If you'd like, I can now:
-
-* Upgrade it to a **more “consulting-grade” README**
-* Add a short **Business Context section (Procurement strategy angle)**
-* Or write a **2-line CV bullet to reference this repo professionally**
-
-Your repo is now genuinely interview-ready 🔥
